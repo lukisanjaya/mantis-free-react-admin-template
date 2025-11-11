@@ -56,38 +56,60 @@ export default function Breadcrumbs({
   }
 
   useEffect(() => {
-    navigation?.items?.map((menu) => {
-      if (menu.type && menu.type === 'group') {
-        if (menu?.url && menu.url === customLocation) {
+    setMain(undefined);
+    setItem(undefined);
+    
+    const findMatch = (menuItems) => {
+      let found = false;
+      
+      menuItems?.forEach((menu) => {
+        if (found) return; // Exit early if already found
+        
+        if (menu.type === 'group') {
+          if (menu?.url && menu.url === customLocation) {
+            setMain(menu);
+            setItem(menu);
+            found = true;
+          } else if (menu.children) {
+            found = getCollapse(menu, found);
+          }
+        }
+      });
+      
+      return found;
+    };
+    
+    findMatch(navigation?.items);
+  }, [location, customLocation]);
+
+  // set active item state - returns true if match found
+  const getCollapse = (menu, alreadyFound = false) => {
+    if (alreadyFound || !menu.children || custom) return false;
+    
+    let found = false;
+    
+    menu.children.forEach((collapse) => {
+      if (found) return; // Exit early if already found
+      
+      if (collapse.type === 'collapse') {
+        // Recursively search in nested collapse
+        if (getCollapse(collapse, found)) {
+          found = true;
+        }
+      } else if (collapse.type === 'item') {
+        // Match exact URL or dynamic URL pattern
+        const urlPattern = collapse.url?.replace(/:[^/]+/g, '[^/]+');
+        const regex = new RegExp(`^${urlPattern}$`);
+        
+        if (customLocation === collapse.url || regex.test(customLocation)) {
           setMain(menu);
-          setItem(menu);
-        } else {
-          getCollapse(menu);
+          setItem(collapse);
+          found = true;
         }
       }
-      return false;
     });
-  });
-
-  // set active item state
-  const getCollapse = (menu) => {
-    if (!custom && menu.children) {
-      menu.children.filter((collapse) => {
-        if (collapse.type && collapse.type === 'collapse') {
-          getCollapse(collapse);
-          if (collapse.url === customLocation) {
-            setMain(collapse);
-            setItem(collapse);
-          }
-        } else if (collapse.type && collapse.type === 'item') {
-          if (customLocation === collapse.url) {
-            setMain(menu);
-            setItem(collapse);
-          }
-        }
-        return false;
-      });
-    }
+    
+    return found;
   };
 
   // item separator
